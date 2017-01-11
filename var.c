@@ -1,0 +1,15 @@
+#include "naive.h"
+#include <string.h>
+#include <stdlib.h>
+struct vardef *vardef_head = NULL,*vardef_tail = NULL;
+void put_vardef(char* name, struct ast* v);
+{
+	struct vardef *p =  = malloc(sizeof(struct vardef));
+	*p = (struct vardef){strdup(name), v, NULL};
+	if(vardef_head == NULL && vardef_tail == NULL){
+		vardef_head = vardef_tail = p;
+	}else{
+		vardef_tail->next = p;
+		vardef_tail = p;
+	}
+}

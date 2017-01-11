@@ -1,0 +1,123 @@
+%{
+	#include <stdio.h>
+	#include <stdlib.h>
+	#include "naive.h"
+	#include "lib/list.h"
+	enum type vartype;
+%}
+%nonassoc <cmptype> CMP
+%right '=' ADD_ASGN SUB_ASGN MUL_ASGN DIV_ASGN
+%right ','
+%left '!'
+%left OR
+%left AND
+%left '+' '-'
+%left '*' '/'
+
+%union{
+	int integer;
+	double d;
+	int type;
+	int cmptype;
+	char* s;
+}
+%token INTEGER
+%token REAL
+%token NAME
+%token <type> TYPE
+%token TRUE FALSE
+%token AND OR DEC INC EOL ADD_ASGN SUB_ASGN MUL_ASGN DIV_ASGN IF ELSE WHILE DIS FOR RETURN
+%start program
+
+%%
+
+program: external_declaration
+;
+
+external_declaration: declaration external_declaration{
+	struct vardef* p = vardef_head;
+	while(p != NULL){
+		globalvardef(p->name, $1, p->v);
+		vardef_head = p;
+		p = p->next;
+		free(vardef_head);
+	}
+	vardef_head = vardef_tail = NULL;
+}
+|fucn_declaration external_declaration
+|/*empty*/
+;
+fucn_declaration: TYPE NAME '(' parameter_list ')' '{' block_list '}' 
+| TYPE NAME '(' ')' '{' block_list '}'
+;
+parameter_list: parameter_list ',' TYPE NAME
+|TYPE NAME
+;
+block:'{' block_list '}'
+| statement
+| control
+;
+block_list: block
+| block block_list
+;
+control: IF '(' expression ')' block
+//| IF '(' expression_list ')' block ELSE block
+| WHILE '(' expression ')' block
+//| FOR '('statement ';' expression ';' expression ')' block
+| RETURN expression';'
+;
+statement: expression';'
+| declaration';'{
+	struct vardef* p = vardef_head;
+	while(p != NULL){
+		localvardef(p->name, $1, p->v);
+		vardef_head = p;
+		p = p->next;
+		free(vardef_head);
+	}
+	vardef_head = vardef_tail = NULL;
+}
+|';'
+;
+declaration: TYPE declaration_list	{ $$ = $2; }
+;
+declaration_list: NAME init		{ put_vardef($1, $2); }
+| declaration_list ',' NAME init	{ put_vardef($3, $4); }
+;
+init: /*empty*/				{ $$ = NULL; }
+| '=' expression			{ $$ = $2; }
+;
+expression: expression '+' expression	{ $$ = newast('+', $1, $3); }
+| expression '-' expression		{ $$ = newast('-', $1, $3); }
+| expression '*' expression		{ $$ = newast('*', $1, $3); }
+| expression '/' expression		{ $$ = newast('/', $1, $3); }
+| '!' expression			{ $$ = newast('!', $2, NULL); }
+| expression CMP expression		{ $$ = newcmp('0' + $2, $1, $3); }
+| expression AND expression		{ $$ = newast(AND, $1, $3); }
+| expression OR expression		{ $$ = newast(OR, $1, $3); }
+| '(' expression')'			{ $$ = $2; }
+| assign_expression			{ $$ = $1; }
+| func_call	{ $$ = $1; }
+| NAME		{ $$ = newvarref($1); }
+| INTEGER	{ $$ = newint($1); }
+| REAL		{ $$ = newdouble($1); }
+| TRUE		{ $$ = newbool(true); }
+| FALSE		{ $$ = newbool(false); }
+;
+func_call: NAME '(' arguements_list ')'
+| NAME '(' ')'
+;
+arguements_list: arguements_list ',' expression
+|expression
+;
+assign_expression: NAME '=' expression	{ $$ = newasgn($1,$3); }
+| NAME INC			{ $$ = newinc($1); }
+| NAME DEC			{ $$ = newdec($1); }
+| INC NAME			{ $$ = newasgnarithmetric(ADD_ASGN, $1, newint(1)); }
+| DEC NAME			{ $$ = newasgnarithmetric(SUB_ASGN, $1, newint(1)); }
+| NAME ADD_ASGN expression	{ $$ = newasgnarithmetric(ADD_ASGN, $1, $3); }
+| NAME SUB_ASGN expression	{ $$ = newasgnarithmetric(SUB_ASGN, $1, $3); }
+| NAME MUL_ASGN expression	{ $$ = newasgnarithmetric(MUL_ASGN, $1, $3); }
+| NAME DIV_ASGN expression	{ $$ = newasgnarithmetric(DIV_ASGN, $1, $3); }
+;
+%%
